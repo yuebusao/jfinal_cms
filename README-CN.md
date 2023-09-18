@@ -66,7 +66,7 @@
 
 ##### V4.5.0-V5.1.0——RCE
 
-由于最新的版本`v5.1.0`用到的`fastjson`为`1.2.62`并且没有开`autoType`，作为一个菜逼我没有找到`RCE`的办法。但是经过测试发现`v4.5.0~v5.0.1`用的都是`fastjson 1.2.28`,使用缓存即可绕过，用`ldap`打个`fastjson`全版本通杀反序列化链子即可`RCE`。
+经过测试发现`v4.5.0~v5.0.1`用的都是`fastjson 1.2.28`,使用缓存即可绕过，用`ldap`打个`fastjson`全版本通杀反序列化链子即可`RCE`。
 
 `RCE`测试在`v5.0.1`版本进行。
 
@@ -166,7 +166,7 @@
 }
 ```
 
-本来想覆盖`jsp`文件的，因为翻`issuse`看到有人是这么做的。但是我本地测试发现没办法触发`login.jsp`（不知道是不是本地的问题），似乎都被`url-pattern：/*`拦截了，远程我没有进行测试，如果可以触发`login.jsp`倒也是个好办法。
+本来想覆盖`jsp`文件的，因为翻`issue`看到有人是这么做的 [there](https://github.com/jflyfox/jfinal_cms/issues/58)。但是我本地测试发现没办法触发`login.jsp`（不知道是不是本地的问题），似乎都被`url-pattern：/*`拦截了，远程我没有进行测试，如果可以触发`login.jsp`倒也是个好办法。
 
 ```xml
 	<welcome-file-list>

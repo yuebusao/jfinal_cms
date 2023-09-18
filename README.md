@@ -72,7 +72,7 @@ The first attribute of `json`, `"state":"SUCCESS`", is uncontrollable. A small `
 
 ##### V4.5.0-V5.1.0——RCE
 
-Since the latest version of `v5.1.0` uses `fastjson` as `1.2.62` and does not have `autoType` enabled, as a novice I have not found a way to `RCE`. However, after testing, it was found that `v4.5.0~v5.0.1` all use `fastjson 1.2.28`, which can be bypassed by using cache. Just use `ldap` to create a `fastjson` full version deserialization chain. `RCE`.
+After testing, it was found that `v4.5.0~v5.0.1` all use `fastjson 1.2.28`, which can be bypassed by using cache. Just use `ldap` to create a `fastjson` full version deserialization chain. `RCE`.
 
 `RCE` testing is conducted in `v5.0.1` version.
 
@@ -172,7 +172,7 @@ Before `1.2.68`, `autoType` could be bypassed by expecting classes, and this pro
 }
 ```
 
-I originally wanted to overwrite the `jsp` file, because I saw someone doing this when looking at `issues`. However, my local test found that `login.jsp` cannot be triggered (I don’t know if it is a local problem). It seems to be intercepted by `url-pattern:/*`. I have not tested remotely. If `login.jsp can be triggered, `That's a good idea.
+I originally wanted to overwrite the `jsp` file, because I saw someone doing this [there](https://github.com/jflyfox/jfinal_cms/issues/58). However, my local test found that `login.jsp` cannot be triggered (I don’t know if it is a local problem). It seems to be intercepted by `url-pattern:/*`. I have not tested remotely. If `login.jsp can be triggered, `That's a good idea.
 
 ```xml
 	<welcome-file-list>
