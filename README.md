@@ -1,7 +1,5 @@
 # jfinal_cms has Json Injection vulnerability
 
-[toc]
-
 #### TL;DR
 
 `jfinal_cms` has a `json` injection vulnerability. A lower version of `fastjson` can lead to remote command execution in the foreground. The default `fastjson` version that `jfinal_cms` depends on meets the remote command execution conditions.
